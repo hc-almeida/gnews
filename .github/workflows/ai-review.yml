@@ -1,4 +1,4 @@
-name: AI Code Review (Gemini)
+name: AI Code Review
 
 on:
   pull_request:
@@ -37,7 +37,7 @@ jobs:
           # 2) Limitar tamanho (evita estourar limite)
           DIFF_TRIMMED="$(printf "%s" "$DIFF" | head -c 160000)"
 
-          # 3) Prompt mais limpo (seu estilo)
+          # 3) Prompt
           PROMPT=$'Você é um Engenheiro de Segurança Sênior (DevSecOps).\n\nAnalise APENAS o DIFF do Pull Request e reporte:\n- Vulnerabilidades OWASP Top 10 (priorize SQL Injection e Insecure Deserialization)\n- Problemas de segurança em queries/inputs/logs\n- Code smells e complexidade desnecessária\n- Sugestões objetivas (com exemplos de correção)\n\nFormato:\n1) Achados críticos (com evidência)\n2) Achados importantes\n3) Melhorias\n\nDIFF:\n'
 
           REQUEST_JSON="$(jq -n --arg prompt "$PROMPT" --arg diff "$DIFF_TRIMMED" '{
@@ -71,7 +71,7 @@ jobs:
           fi
 
           if [ -z "$REVIEW_TEXT" ]; then
-            # fallback: mostrar erro bruto (útil pra relatório)
+            # fallback:
             REVIEW_TEXT="Falha ao gerar review com Gemini.\n\nResposta bruta:\n\`\`\`json\n$(echo "$RESPONSE" | jq -c '.')\n\`\`\`"
           fi
 

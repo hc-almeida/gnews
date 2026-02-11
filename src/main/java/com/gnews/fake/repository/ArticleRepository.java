@@ -23,5 +23,4 @@ public class ArticleRepository {
         String query = "SELECT * FROM news WHERE title = '" + userInput + "'";
         return jdbcTemplate.query(query, new NewsRowMapper());
     }
-
 }

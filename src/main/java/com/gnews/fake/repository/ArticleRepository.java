@@ -9,7 +9,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Repository
 public class ArticleRepository {
-    
+
     private final List<Article> articles = new CopyOnWriteArrayList<>();
 
     public void saveAll(List<Article> newArticles) {

@@ -17,70 +17,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Review PR diff with Gemini and comment
+      - name: AI Reviewer
+        uses: anc95/ChatGPT-CodeReview@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-          COMMENTS_URL: ${{ github.event.pull_request.comments_url }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # 1) Buscar o diff do PR
-          DIFF="$(curl -fsSL \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github.v3.diff" \
-            "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}")"
-
-          # 2) Limitar tamanho (evita estourar limite)
-          DIFF_TRIMMED="$(printf "%s" "$DIFF" | head -c 160000)"
-
-          # 3) Prompt
-          PROMPT=$'Você é um Engenheiro de Segurança Sênior (DevSecOps).\n\nAnalise APENAS o DIFF do Pull Request e reporte:\n- Vulnerabilidades OWASP Top 10 (priorize SQL Injection e Insecure Deserialization)\n- Problemas de segurança em queries/inputs/logs\n- Code smells e complexidade desnecessária\n- Sugestões objetivas (com exemplos de correção)\n\nFormato:\n1) Achados críticos (com evidência)\n2) Achados importantes\n3) Melhorias\n\nDIFF:\n'
-
-          REQUEST_JSON="$(jq -n --arg prompt "$PROMPT" --arg diff "$DIFF_TRIMMED" '{
-            contents: [
-              { role: "user", parts: [ { text: ($prompt + $diff) } ] }
-            ],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 1400
-            }
-          }')"
-
-          GEMINI_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${AI_API_KEY}"
-
-          # 4) Retry simples pra 429 (backoff)
-          call_gemini() {
-            curl -sS -L \
-              -H "Content-Type: application/json" \
-              -d "$REQUEST_JSON" \
-              "$GEMINI_URL"
-          }
-
-          RESPONSE="$(call_gemini)"
-          REVIEW_TEXT="$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')"
-
-          if [ -z "$REVIEW_TEXT" ]; then
-            # tenta novamente se veio vazio/erro
-            sleep 10
-            RESPONSE="$(call_gemini)"
-            REVIEW_TEXT="$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')"
-          fi
-
-          if [ -z "$REVIEW_TEXT" ]; then
-            # fallback:
-            REVIEW_TEXT="Falha ao gerar review com Gemini.\n\nResposta bruta:\n\`\`\`json\n$(echo "$RESPONSE" | jq -c '.')\n\`\`\`"
-          fi
-
-          BODY=$'## AI Code Review (Gemini 2.0 Flash)\n\n'"$REVIEW_TEXT"$'\n\n---\n_Este comentário foi gerado automaticamente via GitHub Actions._'
-
-          # 5) Postar comentário no PR
-          curl -fsSL \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n --arg body "$BODY" '{body: $body}')" \
-            "$COMMENTS_URL"
+          OPENAI_API_KEY: ${{ secrets.AI_API_KEY }}
+          OPENAI_API_ENDPOINT: https://generativelanguage.googleapis.com/v1beta/openai
+          MODEL: gemini-2.5-flash
+          LANGUAGE: Portuguese
+          top_p: 0.95
+          temperature: 0.7
+          max_tokens: 4096
+          PROMPT: |
+            Aja como um Engenheiro de Segurança Sênior (DevSecOps).
+            Analise o DIFF deste Pull Request buscando:
+            1. Vulnerabilidades OWASP Top 10 (especialmente SQL Injection e Insecure Deserialization).
+            2. Code Smells e complexidade ciclomática desnecessária.
+            3. Aderência às melhores práticas de Java 25 e Spring Boot 3.4.
+            4. Responda com comentários técnicos e construtivos diretamente nas linhas do código afetado.
